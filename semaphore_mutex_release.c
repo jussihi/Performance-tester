@@ -13,7 +13,20 @@
 
 void* mutex_keeper(void* w_args)
 {
-    
+    struct sema_mutex_args_struct* args = (struct sema_mutex_args_struct*)w_args;
+    pthread_mutex_t* pmutex = args->mutex;
+    int* status = args->status;
+    pthread_barrier_t* barr = args->barr;
+
+    while(*status != -1)
+    {
+        pthread_barrier_wait(barr);
+        if(*status == -1) break;
+        pthread_mutex_lock(pmutex);
+        pthread_barrier_wait(barr);
+        clock_gettime(CLOCK_REALTIME, start);
+        pthread_mutex_unlock(pmutex);
+    }
     return NULL;
 }
 
@@ -38,6 +51,8 @@ void* semaphore_keeper(void* w_args)
 
 void semaphore_mutex_not_empty(int w_iterations, int w_drop_cache)
 {
+    printf("\nMEASURING SEMAPHORE AND MUTEX ACQUISITION TIME AFTER RELEASE\n");
+
     // start = malloc(sizeof(struct timespec));
     start  = mmap(NULL, sizeof(struct timespec), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
     finish = mmap(NULL, sizeof(struct timespec), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
@@ -45,7 +60,7 @@ void semaphore_mutex_not_empty(int w_iterations, int w_drop_cache)
     sem_t* id;
 
     int* status = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
-    *status = 4;
+    *status = 1;
 
     // HUOM HUOM
     sem_unlink("releasesem");
@@ -91,10 +106,96 @@ void semaphore_mutex_not_empty(int w_iterations, int w_drop_cache)
 
     printf("\nCached\t\tmean semaphore acquisition time after release with %d samples: %f ns\n", w_iterations - (w_iterations / 5), totSemaphoreCached / (w_iterations - (w_iterations / 5)));
     
+    if(w_drop_cache)
+    {
+        pthread_create(&thread_creation, NULL, semaphore_keeper, (void*)&args);
+
+        int noncache_iterations = w_iterations / 10;
+
+        double totSemaphoreUncached = 0.0;
+
+        *status = 1;
+
+        for(int i = 0; i < noncache_iterations; i++)
+        {
+            pthread_barrier_wait(args.barr);
+            drop_cache();
+            pthread_barrier_wait(args.barr);
+            if(sem_wait(id)) printf("WAIT FAILED ON PARENT");
+            clock_gettime(CLOCK_REALTIME, finish);
+            totSemaphoreUncached += (finish->tv_nsec - start->tv_nsec);
+            if(sem_post(id)) printf("POST FAILED ON PARENT");
+        }
+
+        *status = -1;
+        pthread_barrier_wait(args.barr);
+
+        pthread_join(thread_creation, NULL);
+
+        printf("Non-cached\tmean semaphore acquisition time after release with %d samples: %f ns\n", noncache_iterations, totSemaphoreUncached / noncache_iterations);
+    }
+
+    sem_close(id);
+
+    args.mutex = malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init(args.mutex, NULL);
+
     // calculate mutex times here
-    pthread_create(&thread_creation, NULL, mutex_keeper, NULL);
+    *status = 1;
+    pthread_create(&thread_creation, NULL, mutex_keeper, (void*)&args);
+
+    double totMutexCached = 0.0;
+
+    for(int i = 0; i < w_iterations; i++)
+    {
+        pthread_barrier_wait(args.barr);
+        pthread_barrier_wait(args.barr);
+        pthread_mutex_lock(args.mutex);
+        clock_gettime(CLOCK_REALTIME, finish);
+        if(i >= (w_iterations/5))
+        {
+            totMutexCached += (finish->tv_nsec - start->tv_nsec);
+        }
+        pthread_mutex_unlock(args.mutex);
+    }
+    // very ugly
+    *status = -1;
+    pthread_barrier_wait(args.barr);
 
     pthread_join(thread_creation, NULL);
 
-    sem_close(id);
+    printf("\nCached\t\tmean mutex acquisition time after release with %d samples: %f ns\n", w_iterations - (w_iterations / 5), totMutexCached / (w_iterations - (w_iterations / 5)));
+    
+    if(w_drop_cache)
+    {
+        *status = 1;
+
+        pthread_create(&thread_creation, NULL, mutex_keeper, (void*)&args);
+
+        int noncache_iterations = w_iterations / 10;
+
+        double totMutexUncached = 0.0;
+
+        for(int i = 0; i < noncache_iterations; i++)
+        {
+            pthread_barrier_wait(args.barr);
+            drop_cache();
+            pthread_barrier_wait(args.barr);
+            pthread_mutex_lock(args.mutex);
+            clock_gettime(CLOCK_REALTIME, finish);
+            totMutexUncached += (finish->tv_nsec - start->tv_nsec);  
+            pthread_mutex_unlock(args.mutex);
+        }
+
+        *status = -1;
+        pthread_barrier_wait(args.barr);
+
+        pthread_join(thread_creation, NULL);
+
+        printf("Non-cached\tmean mutex acquisition time after release with %d samples: %f ns\n", noncache_iterations, totMutexUncached / noncache_iterations);
+    }
+    
+    munmap(status, sizeof(int));
+    munmap(start, sizeof(struct timespec));
+    munmap(finish, sizeof(struct timespec));
 }

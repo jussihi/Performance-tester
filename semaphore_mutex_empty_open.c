@@ -80,7 +80,7 @@ void semaphore_mutex_open(int w_iterations, int w_drop_cache)
     for(int i = 0; i < w_iterations; i++)
     {
         clock_gettime(CLOCK_REALTIME, start);
-        pthread_mutex_init(&mutex,NULL);    // once again check retval!
+        pthread_mutex_init(&mutex, NULL);    // once again check retval!
         pthread_mutex_lock(&mutex);
         clock_gettime(CLOCK_REALTIME, finish);
         pthread_mutex_unlock(&mutex);
@@ -113,7 +113,7 @@ void semaphore_mutex_open(int w_iterations, int w_drop_cache)
             totMutexUncached += (finish->tv_nsec - start->tv_nsec);
         }
 
-        printf("Non-cached\tmean init & acquisition time of a free mutex with %d samples: %f ns.\n", noncache_iterations, (totMutexUncached / noncache_iterations));
+        printf("Non-cached\tmean init & acquisition time of a mutex with %d samples: %f ns.\n", noncache_iterations, (totMutexUncached / noncache_iterations));
 
     }
 

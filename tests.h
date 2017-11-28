@@ -31,9 +31,9 @@ void semaphore_mutex_empty(int w_iterations, int w_drop_cache);
  * Timing of released semaphore / mutex
  * OBS: this is very buggy still
  */
-void* mutex_keeper(void* w_args);
+//void* mutex_keeper(void* w_args);
 
-void* semaphore_keeper(void* w_args);
+//void* semaphore_keeper(void* w_args);
 
 void semaphore_mutex_not_empty(int w_iterations, int w_drop_cache);
 

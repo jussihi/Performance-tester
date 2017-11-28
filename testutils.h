@@ -12,6 +12,7 @@ struct sema_mutex_args_struct {
     sem_t* id;
     int* status;
     pthread_barrier_t* barr;
+    pthread_mutex_t* mutex;
 };
 
 #endif
