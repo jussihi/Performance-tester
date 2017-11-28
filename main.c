@@ -110,7 +110,7 @@ int main(void)
 
     semaphore_mutex_open(1000, has_root);
 
-    semaphore_mutex_not_empty(500);
+    semaphore_mutex_not_empty(500, has_root);
 
     // clock_gettime(CLOCK_REALTIME, &finish);
 

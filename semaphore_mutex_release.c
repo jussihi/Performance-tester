@@ -22,23 +22,21 @@ void* semaphore_keeper(void* w_args)
     struct sema_mutex_args_struct* args = (struct sema_mutex_args_struct*)w_args;
     sem_t* id = args->id;
     int* status = args->status;
+    pthread_barrier_t* barr = args->barr;
 
     while(*status != -1)
     {
-        //printf("waiting for semaphore in thread\n");
-        sem_wait(id);
+        pthread_barrier_wait(barr);
+        if(*status == -1) break;
+        if(sem_wait(id) != 0) perror("sem_wait child");
+        pthread_barrier_wait(barr);
         clock_gettime(CLOCK_REALTIME, start);
-        //printf("new clock\n");
-        sem_post(id);
-        //printf("posted\n");
-        // give main thread some time to recover from calculations
-        usleep(20);
-        //printf("posted semaphore in thread\n");
+        if(sem_post(id) != 0) printf("sem_post child");
     }
     return NULL;
 }
 
-void semaphore_mutex_not_empty(int w_iterations)
+void semaphore_mutex_not_empty(int w_iterations, int w_drop_cache)
 {
     // start = malloc(sizeof(struct timespec));
     start  = mmap(NULL, sizeof(struct timespec), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
@@ -47,47 +45,56 @@ void semaphore_mutex_not_empty(int w_iterations)
     sem_t* id;
 
     int* status = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
-    *status = 1;
+    *status = 4;
 
-    if((id = sem_open("threadsem", O_CREAT, 0600, 0)) == SEM_FAILED)
+    // HUOM HUOM
+    sem_unlink("releasesem");
+
+    if((id = sem_open("releasesem", O_CREAT | O_EXCL, 0600, 0)) == SEM_FAILED)
     {
         perror("sem_open");
     }
 
-    sem_post(id);
+    if(sem_post(id)) printf("asdloldaa");
 
     struct sema_mutex_args_struct args;
     args.id = id;
     args.status = status;
+    args.barr = malloc(sizeof(pthread_barrier_t));
+
+    pthread_barrier_init(args.barr, NULL, 2);
 
     pthread_t thread_creation;
 
     pthread_create(&thread_creation, NULL, semaphore_keeper, (void*)&args);
 
-    double totSemaphore = 0.0;
-
-    usleep(1000);
+    double totSemaphoreCached = 0.0;
 
     for(int i = 0; i < w_iterations; i++)
     {
-        //usleep(100);
-        sem_wait(id);
-        //printf("got sem\n");
+        pthread_barrier_wait(args.barr);
+        pthread_barrier_wait(args.barr);
+        if(sem_wait(id)) printf("WAIT FAILED ON PARENT");
         clock_gettime(CLOCK_REALTIME, finish);
         //double thisTime = (finish->tv_nsec - start->tv_nsec);
-        totSemaphore += (finish->tv_nsec - start->tv_nsec);
+        if(i >= (w_iterations/5))
+        {
+            totSemaphoreCached += (finish->tv_nsec - start->tv_nsec);
+        }
         //printf("%f\n", thisTime);
-        sem_post(id);
-        usleep(10);
+        if(sem_post(id)) printf("POST FAILED ON PARENT");
     }
     // very ugly
     *status = -1;
+    pthread_barrier_wait(args.barr);
     pthread_join(thread_creation, NULL);
-    printf("Total time getting released semaphore was: %f ms\n", totSemaphore / 1000000);
-    printf("Mean time getting a released semaphore was: %f us\n", totSemaphore / (w_iterations * 1000));
 
+    printf("\nCached\t\tmean semaphore acquisition time after release with %d samples: %f ns\n", w_iterations - (w_iterations / 5), totSemaphoreCached / (w_iterations - (w_iterations / 5)));
+    
     // calculate mutex times here
     pthread_create(&thread_creation, NULL, mutex_keeper, NULL);
 
     pthread_join(thread_creation, NULL);
+
+    sem_close(id);
 }

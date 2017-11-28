@@ -11,6 +11,7 @@ extern double gettime_nocached;
 struct sema_mutex_args_struct {
     sem_t* id;
     int* status;
+    pthread_barrier_t* barr;
 };
 
 #endif

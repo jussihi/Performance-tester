@@ -27,6 +27,7 @@ void semaphore_mutex_open(int w_iterations, int w_drop_cache)
 
     for(int i = 0; i < w_iterations; i++)
     {
+        sem_unlink("mysem");
         clock_gettime(CLOCK_REALTIME, start);
         if((id = sem_open("mysem", O_CREAT, 0600, 0)) == SEM_FAILED)    // check retval! / slows down???
         {
@@ -52,6 +53,7 @@ void semaphore_mutex_open(int w_iterations, int w_drop_cache)
 
         for(int i = 0; i < noncache_iterations; i++)
         {
+            sem_unlink("mysem");
             drop_cache();
             clock_gettime(CLOCK_REALTIME, start);
             if((id = sem_open("mysem", O_CREAT, 0600, 0)) == SEM_FAILED)    // slows down?
@@ -128,6 +130,7 @@ void semaphore_mutex_empty(int w_iterations, int w_drop_cache)
 
     sem_t* id;
     // create new semaphore, it is also acquired here,
+    sem_unlink("mysem");
     if((id = sem_open("mysem", O_CREAT, 0600, 0)) == SEM_FAILED)    // check retval!
     {
         perror("sem_open");

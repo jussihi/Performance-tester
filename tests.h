@@ -35,7 +35,7 @@ void* mutex_keeper(void* w_args);
 
 void* semaphore_keeper(void* w_args);
 
-void semaphore_mutex_not_empty(int w_iterations);
+void semaphore_mutex_not_empty(int w_iterations, int w_drop_cache);
 
 
 

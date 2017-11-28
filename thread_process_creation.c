@@ -20,7 +20,7 @@ void measure_creation_overhead(int w_iterations, int w_drop_cache)
 {
     printf("\nMEASURING PROCESS AND THREAD CREATION OVERHEAD\n");
     start = malloc(sizeof(struct timespec));
-    finish = mmap(NULL, sizeof(struct timespec), PROT_READ | PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0);
+    finish = mmap(NULL, sizeof(struct timespec), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
 
     double retProcessCached = 0.0;
     
