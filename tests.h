@@ -5,7 +5,7 @@
 
 /*
  * Function to drop the instruction cache from CPU
- * slows down syscalls
+ * slows down syscalls (intentionally!)
  */
 void drop_cache();
 
@@ -38,6 +38,11 @@ void semaphore_mutex_empty(int w_iterations, int w_drop_cache);
 void semaphore_mutex_not_empty(int w_iterations, int w_drop_cache);
 
 
+/*
+ * File copy tests
+ */
 
 
+// filesize in MiB!
+void file_copy(int w_numFiles, int w_fileSize, int w_drop_cache);
 #endif

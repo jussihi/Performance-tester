@@ -112,6 +112,8 @@ int main(void)
 
     semaphore_mutex_not_empty(500, has_root);
 
+    file_copy(10, 100, has_root);
+
     // clock_gettime(CLOCK_REALTIME, &finish);
 
     // double total = /*(finish.tv_msec - start.tv_msec) * 1000.0 +*/ ((finish.tv_nsec - start.tv_nsec));
