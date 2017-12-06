@@ -82,6 +82,7 @@ double measure_gettime_overhead(int w_iterations, int w_drop_cache)
 
 int main(void)
 {
+	file_transfer(100);
 	int has_root;
 	if(geteuid() != 0)
 	{
