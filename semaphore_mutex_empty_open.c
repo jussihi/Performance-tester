@@ -11,11 +11,15 @@
 #include "tests.h"
 #include "testutils.h"
 
+#include "log.h"
+
+static int log_fd;
+
 
 void semaphore_mutex_open(int w_iterations, int w_drop_cache)
 {
-    // kauanko kestää avata sema / mutex
-    // enpä tätä tullut edes ajatelleeksi
+    log_fd = open("performance_tester.log", O_RDWR | O_APPEND | O_CREAT | O_NONBLOCK, S_IRWXU);
+    log_write(log_fd, 1, "Free semaphore & mutex acquisition overhead measurement routine init.");
     printf("\nMEASURING SEMAPHORE AND MUTEX INIT & ACQUISITION OVERHEAD\n");
 
     start = malloc(sizeof(struct timespec));
@@ -116,13 +120,15 @@ void semaphore_mutex_open(int w_iterations, int w_drop_cache)
         printf("Non-cached\tmean init & acquisition time of a mutex with %d samples: %f ns.\n", noncache_iterations, (totMutexUncached / noncache_iterations));
 
     }
-
+    close(log_fd);
     free(start);
     free(finish);
 }
 
 void semaphore_mutex_empty(int w_iterations, int w_drop_cache)
 {
+    log_fd = open("performance_tester.log", O_RDWR | O_APPEND | O_CREAT | O_NONBLOCK, S_IRWXU);
+    log_write(log_fd, 1, "Empty semaphore & mutex init and acquisition overhead measurement routine init.");
     printf("\nMEASURING MUTEX AND SEMAPHORE ACQUISITION OVERHEAD WHEN THEY ARE FREE\n");
 
     start = malloc(sizeof(struct timespec));
@@ -131,7 +137,7 @@ void semaphore_mutex_empty(int w_iterations, int w_drop_cache)
     sem_t* id;
     // create new semaphore, it is also acquired here,
     sem_unlink("mysem");
-    if((id = sem_open("mysem", O_CREAT, 0600, 0)) == SEM_FAILED)    // check retval!
+    if((id = sem_open("mysem", O_CREAT, 0600, 0)) == SEM_FAILED)  
     {
         perror("sem_open");
         return;
@@ -142,11 +148,12 @@ void semaphore_mutex_empty(int w_iterations, int w_drop_cache)
     double totSemaphoreCached = 0.0;
 
     // problem with first iteration; the clock seems to be very off with the first one, it is 20x slower on the first run?
+    // edit: this is figured out in the diary
     for(int i = 0; i < w_iterations; i++)
     {
         clock_gettime(CLOCK_REALTIME, start);
         // get semaphore, this should always be free
-        if(sem_wait(id) < 0) perror("sem_wait");        // check retval!
+        if(sem_wait(id) < 0) perror("sem_wait");    
         clock_gettime(CLOCK_REALTIME, finish);
         sem_post(id);
         if(i >= (w_iterations / 5))
@@ -163,13 +170,12 @@ void semaphore_mutex_empty(int w_iterations, int w_drop_cache)
 
         double totSemaphoreUncached = 0.0;
 
-        // problem with first iteration; the clock seems to be very off with the first one, it is 20x slower on the first run?
         for(int i = 0; i < noncache_iterations; i++)
         {
             drop_cache();
             clock_gettime(CLOCK_REALTIME, start);
             // get semaphore, this should always be free
-            if(sem_wait(id) < 0) perror("sem_wait");        // check retval!
+            if(sem_wait(id) < 0) perror("sem_wait");
             clock_gettime(CLOCK_REALTIME, finish);
             sem_post(id);
             totSemaphoreUncached += (finish->tv_nsec - start->tv_nsec);
@@ -183,7 +189,7 @@ void semaphore_mutex_empty(int w_iterations, int w_drop_cache)
 
     // create mutex and init it
     pthread_mutex_t mutex;
-    pthread_mutex_init(&mutex,NULL);    // once again check retval!
+    pthread_mutex_init(&mutex,NULL);
 
     double totMutexCached = 0.0;
 
@@ -209,8 +215,6 @@ void semaphore_mutex_empty(int w_iterations, int w_drop_cache)
 
         double totMutexUncached = 0.0;
 
-        // here also same problem as with the first for-loop, the first iteration seems to have huge time difference compared
-        // to the other iterations
         for(int i = 0; i < noncache_iterations; i++)
         {
             drop_cache();
@@ -226,7 +230,7 @@ void semaphore_mutex_empty(int w_iterations, int w_drop_cache)
     }
 
     pthread_mutex_destroy(&mutex);
-
+    close(log_fd);
     free(start);
     free(finish);
 }

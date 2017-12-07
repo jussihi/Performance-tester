@@ -9,6 +9,10 @@
 #include <sys/wait.h>       // wait
 #include "testutils.h"      // start, finish time structs
 
+#include "log.h"
+
+static int log_fd;
+
 int generate_files(int w_numFiles, int w_fileSize)
 {
     if(mkdir("dummyfiles", S_IRWXU | S_IRWXO))
@@ -20,7 +24,7 @@ int generate_files(int w_numFiles, int w_fileSize)
     // generate dummy files for copying
     for(int i = 0; i < w_numFiles; i++)
     {
-        char filename[19] = { 0 };
+        char filename[50] = { 0 };
         int sprintfret = sprintf(filename, "%s%d", "dummyfiles/dummy", i);
         if(sprintfret < 0)
         {
@@ -69,7 +73,6 @@ void* thread_copier(void* w_filename)
         return NULL;
     }
     
-    // tsekkaa vielä oikea tapa avata tiedosto!!!!
     if((fdout = open(outFile, O_WRONLY | O_CREAT, S_IRWXU | S_IRWXO | S_IRWXG)) == -1)
     {
         perror("open");
@@ -98,6 +101,8 @@ void* thread_copier(void* w_filename)
 
 void file_copy(int w_numFiles, int w_fileSize, int w_drop_cache)
 {
+    log_fd = open("performance_tester.log", O_RDWR | O_APPEND | O_CREAT | O_NONBLOCK, S_IRWXU);
+    log_write(log_fd, 1, "Multiple file copy measurement with threads & processes routine init.");
     // sanity check
     if(w_numFiles > 99 || w_numFiles < 1)
     {
@@ -117,7 +122,7 @@ void file_copy(int w_numFiles, int w_fileSize, int w_drop_cache)
 
     start = malloc(sizeof(struct timespec));
     finish = malloc(sizeof(struct timespec));
-    double totCopyTime = 0.0;
+    long totCopyTime = 0;
 
     if(!start || !finish)
     {
@@ -140,7 +145,7 @@ void file_copy(int w_numFiles, int w_fileSize, int w_drop_cache)
     // start copying of files using threads:
     for(int i = 0; i < w_numFiles; i++)
     {
-        char* filename = calloc(19, sizeof(char));
+        char* filename = calloc(300, sizeof(char));
         if(!filename)
         {
             perror("calloc");
@@ -171,7 +176,7 @@ void file_copy(int w_numFiles, int w_fileSize, int w_drop_cache)
     clock_gettime(CLOCK_REALTIME, finish);
 
     totCopyTime = (finish->tv_nsec - start->tv_nsec);
-    printf("\nCopying of %d files (%d MiB each, total %d MiB) took %f ns using threads.\n", w_numFiles, w_fileSize, w_numFiles * w_fileSize, totCopyTime);
+    printf("\nCopying of %d files (%d MiB each, total %d MiB) took %ld ns using threads.\n", w_numFiles, w_fileSize, w_numFiles * w_fileSize, totCopyTime);
 
     clock_gettime(CLOCK_REALTIME, start);
 
@@ -182,9 +187,9 @@ void file_copy(int w_numFiles, int w_fileSize, int w_drop_cache)
     {
         if((child = fork()) == 0)
         {
-            char filename[19] = {0};
+            char filename[300] = {0};
             int sprintfret = sprintf(filename, "%s%d", "dummyfiles/dummy", i);
-            char outFile[24] = {0};
+            char outFile[300] = {0};
             sprintfret = sprintf(outFile, "%s%s", filename, "_fork");
             if(sprintfret < 0)
             {
@@ -201,7 +206,6 @@ void file_copy(int w_numFiles, int w_fileSize, int w_drop_cache)
                 exit(0);
             }
             
-            // tsekkaa vielä oikea tapa avata tiedosto!!!!
             if((fdout = open(outFile, O_WRONLY | O_CREAT, S_IRWXU | S_IRWXO | S_IRWXG)) == -1)
             {
                 perror("open");
@@ -232,20 +236,20 @@ void file_copy(int w_numFiles, int w_fileSize, int w_drop_cache)
     pid_t waited;
     while((waited = wait(NULL))> 0)
     {
-        // PAREMMAT EXITIT FORKEILLE TUOHON!
-        // voi ottaa sitten NULL sijaan jopa paluuarvot talteen!
-        // printf("%d exited\n", (int)waited);
+        // waiting for the children to exit.
+        // here we could also check the exit values of them,
+        // but I didn't have time for that now.
     }
 
     clock_gettime(CLOCK_REALTIME, finish);
     totCopyTime = (finish->tv_nsec - start->tv_nsec);
-    printf("\nCopying of %d files (%d MiB each, total %d MiB) took %f ns using forks.\n", w_numFiles, w_fileSize, w_numFiles * w_fileSize, totCopyTime);
+    printf("\nCopying of %d files (%d MiB each, total %d MiB) took %ld ns using forks.\n", w_numFiles, w_fileSize, w_numFiles * w_fileSize, totCopyTime);
 
 
     // clean up files copied by threads
     for(int i = 0; i < w_numFiles; i++)
     {
-        char filename[26] = {0};
+        char filename[300] = {0};
         int sprintfret = sprintf(filename, "%s%d%s", "dummyfiles/dummy", i, "_thread");
         if(sprintfret < 0)
         {
@@ -258,7 +262,7 @@ void file_copy(int w_numFiles, int w_fileSize, int w_drop_cache)
     // clean up files copied by forks
     for(int i = 0; i < w_numFiles; i++)
     {
-        char filename[24] = {0};
+        char filename[300] = {0};
         int sprintfret = sprintf(filename, "%s%d%s", "dummyfiles/dummy", i, "_fork");
         if(sprintfret < 0)
         {
@@ -272,7 +276,7 @@ void file_copy(int w_numFiles, int w_fileSize, int w_drop_cache)
     // FILE AND FOLDER CLEAN UP
     for(int i = 0; i < w_numFiles; i++)
     {
-        char filename[19] = {0};
+        char filename[30] = {0};
         int sprintfret = sprintf(filename, "%s%d", "dummyfiles/dummy", i);
         if(sprintfret < 0)
         {
@@ -283,6 +287,9 @@ void file_copy(int w_numFiles, int w_fileSize, int w_drop_cache)
     }
     if(remove("dummyfiles")) perror("remove");
 
+    close(log_fd);
+
+    free(threads);
     free(start);
     free(finish);
 
