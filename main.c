@@ -103,6 +103,34 @@ int main(int argc, char** argv)
     sa.sa_flags = 0;
 
     sigaction(SIGINT, &sa, NULL);
+
+    if(argc != 5)
+    {
+        printf("usage: %s <iteration count> <file count> <file size> <buffer size>\n", argv[0]);
+        log_write(log_fd, 1, "The main program was run with wrong parameters. Exiting.");
+        return -1;
+    }
+
+    int iterations = atoi(argv[1]);
+    int files = atoi(argv[2]);
+    int fileSize = atoi(argv[3]);
+    int bufferSize = atoi(argv[4]);
+
+    // sanity check
+    if(iterations < 1 || files < 1 || fileSize < 1 || bufferSize < 1)
+    {
+        printf("Incorrent input parameter(s)! Exiting.\n");
+        log_write(log_fd, 1, "The main program was run with wrong parameters. Exiting.");
+        return -1;
+    }
+
+    // sanity check with OK but somewhat "too small" values
+    if(iterations < 10 || files < 2 || fileSize < 5 || bufferSize < 10)
+    {
+        printf("You input a very small iteration (< 10), file count (<2), file size (<5) or buffer size (<10)\n");
+        printf("The program will continue but the behaviour might be undefined.\n");
+        log_write(log_fd, 1, "The main program is being run with unusual parameters.");
+    }
     
     int hasRoot;
     if(geteuid() != 0)
@@ -119,33 +147,34 @@ int main(int argc, char** argv)
     }
     printf("\n!!!THIS APPLICATION USES CLOCK_REALTIME FOR TIMING!!!\n!!!Please don't change the system time while running this application!!!\n");
 
-    if(run) measure_gettime_overhead(1000, hasRoot);
+    if(run) measure_gettime_overhead(iterations, hasRoot);
     log_write(log_fd, 1, "Gettime overhead measurement routine done.");
 
-    if(run) measure_creation_overhead(1000, hasRoot);
+    if(run) measure_creation_overhead(iterations, hasRoot);
     log_write(log_fd, 1, "Thread & process creation overhead measurement routine done.");
 
-    if(run) semaphore_mutex_empty(1000, hasRoot);
+    if(run) semaphore_mutex_empty(iterations, hasRoot);
     log_write(log_fd, 1, "Empty semaphore & mutex init and acquisition overhead measurement routine done.");
 
-    if(run) semaphore_mutex_open(1000, hasRoot);
+    if(run) semaphore_mutex_open(iterations, hasRoot);
     log_write(log_fd, 1, "Free semaphore & mutex acquisition overhead measurement routine done.");
 
-    if(run) semaphore_mutex_not_empty(500, hasRoot);
+    if(run) semaphore_mutex_not_empty(iterations/2, hasRoot);
     log_write(log_fd, 1, "Semaphore & mutex acquisition after release overhead measurement routine done.");
 
-    if(run) file_copy(10, 100, hasRoot);
+    if(run) file_copy(files, fileSize, hasRoot);
     log_write(log_fd, 1, "Multiple file copy measurement with threads & processes routine done.");
 
-    if(run) file_transfer(100, 4096, hasRoot);
+    if(run) file_transfer(fileSize, bufferSize, hasRoot);
     log_write(log_fd, 1, "File transfer speed measurement with pipes & shared memory routine done.");
 
     if(!run)
     {
-        printf("Program was requested to exit by SIGINT. Exiting.\n");
+        printf("Program was requested to exit by SIGINT.\n");
         log_write(log_fd, 1, "Premature exit (SIGINT).");
     }
     log_write(log_fd, 1, "Program exit.");
     close(log_fd);
+    printf("All done.\n");
     return 0;
 }
