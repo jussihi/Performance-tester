@@ -33,7 +33,6 @@ $ ./performance_tester 1000 10 100 4096
 # Known bugs
 
   - Sometimes the total time in useconds exceeds the maximum value of type *double*, and the test result seems to be a negative time. You can try to lower the iteration count/file sizes to get around it.
-  - The file transfer algorithm doesn't always write the exact copy of the input file.
   - If you run the program once with root privileges, the program will segfault with normal user privileges until a reboot. This is a problem with POSIX semaphores and their privileges.
 
 ### Todos

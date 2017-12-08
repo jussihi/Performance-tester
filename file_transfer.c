@@ -120,14 +120,13 @@ int pipe_transfer(int w_bufferSize, int w_fileSize)
         char buffer[bufferSize];
 
         // write loop
-        charsRead = fread(buffer, 1, bufferSize, fp);
-        do
+        while((charsRead = fread(buffer, 1, bufferSize, fp)) == bufferSize)
         {
             if((write(pipefd[1], buffer, charsRead)) == -1)
             {
-                perror("write returned an error :)");
+                perror("write");
             }
-        } while((charsRead = fread(buffer, 1, bufferSize, fp)) == bufferSize);
+        }
 
         if((write(pipefd[1], buffer, charsRead)) == -1)
         {
@@ -188,7 +187,6 @@ int pipe_transfer(int w_bufferSize, int w_fileSize)
     }
     double total = (finish->tv_nsec - start->tv_nsec);
     printf("Pipe\t\ttransferring %d MiB file with %d byte-sized buffers takes %.2f us. That's %f MiB/s.\n", w_fileSize, w_bufferSize, (double)(total / 1000), (1 / ((double)total / 1000000000)) * w_fileSize);
-    
 
     // remove the copied file
     if(remove("dummyfiles/dummywrite"))
@@ -220,14 +218,15 @@ void* shared_memory_sender(void* w_args)
     int charsRead = 0;
     char buffer[*args->bufferSize];
 
-    charsRead = fread(buffer, 1, *args->bufferSize, fp);
-    do
+    pthread_barrier_wait(args->barr);
+
+    while((charsRead = fread(buffer, 1, *args->bufferSize, fp)) == *args->bufferSize)
     {
         pthread_barrier_wait(args->barr);
         *(args->bytesToRead) = charsRead;
         memcpy(args->filebuff, buffer, *args->bufferSize);
         pthread_barrier_wait(args->barr);
-    } while((charsRead = fread(buffer, 1, *args->bufferSize, fp)) == *args->bufferSize);
+    }
     
     pthread_barrier_wait(args->barr);
     *(args->bytesToRead) = charsRead;
@@ -289,12 +288,14 @@ int shared_memory_transfer(int w_bufferSize, int w_fileSize)
         perror("File opening failed.");
         return -1;
     }
-    pthread_barrier_wait(barr);
+    
     do
     {
         pthread_barrier_wait(barr);
         pthread_barrier_wait(barr);
     } while((readBytes = fwrite(filebuff, 1, *bytesToRead, fp)) == *bufferSize);
+
+    printf("last readBytes was %d\n", readBytes);
 
     fclose(fp);
 
@@ -303,7 +304,6 @@ int shared_memory_transfer(int w_bufferSize, int w_fileSize)
     long total = (finish->tv_nsec - start->tv_nsec);
     printf("\nShared memory\ttransferring %d MiB file with %d byte-sized buffers takes %.2f us. That's %f MiB/s.\n", w_fileSize, w_bufferSize, (double)(total / 1000), (1 / ((double)total / 1000000000)) * w_fileSize);
     
-
     // remove the copied file
     if(remove("dummyfiles/dummywrite"))
     {
